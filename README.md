@@ -36,19 +36,22 @@ chmod +x claude_bar_tab.py
 
 ## Usage
 
-### Option 1: Run from Terminal
+Run the app from terminal:
 ```bash
 ./run.sh
 ```
-This will keep the terminal window open while the app runs. Close the terminal or press Ctrl+C to quit.
 
-### Option 2: Run directly from Finder
-Double-click `run.sh` in Finder to launch the app.
+This will start the app in the background and return to the terminal.
 
-### Option 3: Manual run
+The widget will appear in your menu bar showing your current spend. Click on it to see:
+- Detailed spend information
+- Budget limit
+- Usage percentage
+- Refresh options
+
+To stop the app, click "Quit" from the menu, or run:
 ```bash
-source venv/bin/activate
-python claude_bar_tab.py
+pkill -f claude_bar_tab.py
 ```
 
 The widget will appear in your menu bar showing your current spend. Click on it to see:

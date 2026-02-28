@@ -9,28 +9,40 @@ import os
 import urllib.request
 import urllib.error
 from pathlib import Path
+from datetime import datetime
+from urllib.parse import urlparse
 import rumps
 
 
 class ClaudeSpendApp(rumps.App):
     def __init__(self):
-        super(ClaudeSpendApp, self).__init__("💰", quit_button=None)
+        super(ClaudeSpendApp, self).__init__("❋", quit_button=None)
 
         # Create menu structure with placeholders for spend info
         self.spend_item = rumps.MenuItem("Spend: Loading...", callback=None)
         self.budget_item = rumps.MenuItem("Budget: Loading...", callback=None)
         self.usage_item = rumps.MenuItem("Usage: Loading...", callback=None)
+        self.domain_item = rumps.MenuItem("Domain: Loading...", callback=None)
+        self.expiry_item = rumps.MenuItem("Expires: Loading...", callback=None)
+
+        # Metadata items - will be populated dynamically
+        self.metadata_items = []
 
         self.menu = [
             self.spend_item,
             self.budget_item,
             self.usage_item,
+            self.expiry_item,
             None,  # Separator
-            "Refresh Now",
+            self.domain_item,
+            None,  # Separator (metadata will be inserted here)
+            "Metadata",
             None,  # Separator
             rumps.MenuItem("Auto-refresh: 5 min", callback=self.set_interval_5),
             rumps.MenuItem("Auto-refresh: 10 min", callback=self.set_interval_10),
             rumps.MenuItem("Auto-refresh: 30 min", callback=self.set_interval_30),
+            None,  # Separator (metadata will be inserted here)
+            "Refresh Now",
             None,
             "Quit"
         ]
@@ -69,7 +81,7 @@ class ClaudeSpendApp(rumps.App):
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
                 data = json.load(response)
-                return data["info"]
+                return data["info"], url
         except urllib.error.URLError as e:
             raise Exception(f"Failed to fetch spend info: {e}")
 
@@ -81,24 +93,53 @@ class ClaudeSpendApp(rumps.App):
     def update_spend(self, _):
         """Update the menu bar with current spend information."""
         try:
-            info = self.fetch_spend_info()
+            info, base_url = self.fetch_spend_info()
             spend = info["spend"]
             max_budget = info["max_budget"]
             pct = (spend / max_budget * 100) if max_budget > 0 else 0
 
             # Update menu bar title
-            self.title = f"💰 ${spend:.2f}"
+            self.title = f"❋ ${spend:.2f}"
 
             # Update menu items with detailed info
             self.spend_item.title = f"Spend: ${spend:.2f}"
             self.budget_item.title = f"Budget: ${max_budget:.2f}"
             self.usage_item.title = f"Usage: {pct:.1f}%"
 
+            # Update domain
+            parsed_url = urlparse(base_url)
+            self.domain_item.title = f"Domain: {parsed_url.netloc}"
+
+            # Update expiry - calculate days until expiration
+            expires_str = info.get("expires", "")
+            if expires_str:
+                expires_dt = datetime.fromisoformat(expires_str.replace('+00:00', ''))
+                days_until_expiry = (expires_dt - datetime.now()).days
+                self.expiry_item.title = f"Expires: {days_until_expiry}d"
+            else:
+                self.expiry_item.title = "Expires: Unknown"
+
+            # Update metadata - remove old metadata items first
+            for item in self.metadata_items:
+                if item in self.menu.values():
+                    self.menu.pop(item.title)
+            self.metadata_items.clear()
+
+            # Add new metadata items
+            metadata = info.get("metadata", {})
+            if metadata:
+                for key, value in metadata.items():
+                    item = rumps.MenuItem(f"{key}: {value}", callback=None)
+                    self.metadata_items.append(item)
+                    self.menu.insert_after("Metadata", item)
+
         except Exception as e:
-            self.title = "💰 Error"
+            self.title = "❋ Error"
             self.spend_item.title = "Spend: Error"
             self.budget_item.title = "Budget: Error"
             self.usage_item.title = "Usage: Error"
+            self.domain_item.title = "Domain: Error"
+            self.expiry_item.title = "Expires: Error"
             print(f"Error updating spend: {e}")
 
     def set_interval_5(self, sender):

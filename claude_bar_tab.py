@@ -15,7 +15,17 @@ import rumps
 class ClaudeSpendApp(rumps.App):
     def __init__(self):
         super(ClaudeSpendApp, self).__init__("💰", quit_button=None)
+
+        # Create menu structure with placeholders for spend info
+        self.spend_item = rumps.MenuItem("Spend: Loading...", callback=None)
+        self.budget_item = rumps.MenuItem("Budget: Loading...", callback=None)
+        self.usage_item = rumps.MenuItem("Usage: Loading...", callback=None)
+
         self.menu = [
+            self.spend_item,
+            self.budget_item,
+            self.usage_item,
+            None,  # Separator
             "Refresh Now",
             None,  # Separator
             rumps.MenuItem("Auto-refresh: 5 min", callback=self.set_interval_5),
@@ -80,23 +90,15 @@ class ClaudeSpendApp(rumps.App):
             self.title = f"💰 ${spend:.2f}"
 
             # Update menu items with detailed info
-            if "Refresh Now" in self.menu:
-                self.menu.pop("Refresh Now")
-
-            self.menu.insert_before(
-                "Auto-refresh: 5 min",
-                [
-                    rumps.MenuItem(f"Spend: ${spend:.2f}", callback=None),
-                    rumps.MenuItem(f"Budget: ${max_budget:.2f}", callback=None),
-                    rumps.MenuItem(f"Usage: {pct:.1f}%", callback=None),
-                    None,
-                    "Refresh Now",
-                    None
-                ]
-            )
+            self.spend_item.title = f"Spend: ${spend:.2f}"
+            self.budget_item.title = f"Budget: ${max_budget:.2f}"
+            self.usage_item.title = f"Usage: {pct:.1f}%"
 
         except Exception as e:
             self.title = "💰 Error"
+            self.spend_item.title = "Spend: Error"
+            self.budget_item.title = "Budget: Error"
+            self.usage_item.title = "Usage: Error"
             print(f"Error updating spend: {e}")
 
     def set_interval_5(self, sender):

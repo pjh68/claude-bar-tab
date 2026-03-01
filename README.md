@@ -13,10 +13,55 @@ A macOS menu bar widget that displays your Claude API Gateway spend information.
 ## Requirements
 
 - macOS
-- Python 3.7+
 - Access to `~/.claude/settings.json` with API credentials
 
 ## Installation
+
+### Option 1: Standalone App (Recommended)
+
+Build a standalone macOS application that doesn't require Python to be installed:
+
+1. Clone this repository and navigate to it:
+```bash
+git clone https://github.com/pjh68/claude-bar-tab.git
+cd claude-bar-tab
+```
+
+2. Create a virtual environment and install dependencies:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+pip install py2app
+```
+
+3. Build the app:
+```bash
+python setup.py py2app
+```
+
+4. Install the app:
+```bash
+cp -r "dist/Claude Bar Tab.app" /Applications/
+```
+
+5. Launch the app:
+```bash
+open "/Applications/Claude Bar Tab.app"
+```
+
+The app runs as a menu bar-only application (no dock icon) and includes all dependencies.
+
+**To rebuild after making changes:**
+```bash
+source venv/bin/activate
+rm -rf build dist
+python setup.py py2app
+```
+
+### Option 2: Run from Python Script
+
+For development or if you prefer running directly from Python:
 
 1. Create a virtual environment:
 ```bash
@@ -29,47 +74,37 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Make the script executable:
-```bash
-chmod +x claude_bar_tab.py
-```
-
-## Usage
-
-Run the app from terminal:
+3. Run the app:
 ```bash
 ./run.sh
 ```
-
-This will start the app in the background and return to the terminal.
-
-The widget will appear in your menu bar showing your current spend. Click on it to see:
-- Detailed spend information
-- Budget limit
-- Usage percentage
-- Refresh options
 
 To stop the app, click "Quit" from the menu, or run:
 ```bash
 pkill -f claude_bar_tab.py
 ```
 
-The widget will appear in your menu bar showing your current spend. Click on it to see:
+## Usage
+
+The widget will appear in your menu bar showing your current spend (e.g., "❋ $12.34"). Click on it to see:
 - Detailed spend information
 - Budget limit
 - Usage percentage
-- Refresh options
+- Domain information
+- Expiration date
+- Auto-refresh interval options (5, 10, or 30 minutes)
+- Manual refresh option
 
 ## Auto-start on Login (Optional)
 
-To make the app start automatically when you log in:
+### For Standalone App (Recommended)
 
 1. Open **System Settings** → **General** → **Login Items**
 2. Click the **+** button
-3. Navigate to and select the `claude_bar_tab.py` script
-4. Or create a LaunchAgent (see below for advanced setup)
+3. Navigate to `/Applications/` and select **Claude Bar Tab**
+4. The app will now start automatically when you log in
 
-### Advanced: Create a LaunchAgent
+### For Python Script
 
 Create `~/Library/LaunchAgents/com.claude.bartab.plist`:
 
@@ -111,6 +146,14 @@ The app reads your API credentials from `~/.claude/settings.json`:
   }
 }
 ```
+
+### App Build Configuration
+
+The standalone app is configured in `setup.py` with the following settings:
+- **Bundle ID**: `com.github.pjh68.claude-bar-tab`
+- **Version**: 1.0.0
+- **Menu bar only**: No dock icon (`LSUIElement: True`)
+- **Included packages**: rumps, urllib, json
 
 ## Troubleshooting
 

@@ -15,15 +15,19 @@ import rumps
 
 
 class ClaudeSpendApp(rumps.App):
+    def do_nothing(self, _):
+        """Dummy callback to prevent menu items from being greyed out."""
+        pass
+
     def __init__(self):
         super(ClaudeSpendApp, self).__init__("❋", quit_button=None)
 
         # Create menu structure with placeholders for spend info
-        self.spend_item = rumps.MenuItem("Spend: Loading...", callback=None)
-        self.budget_item = rumps.MenuItem("Budget: Loading...", callback=None)
-        self.usage_item = rumps.MenuItem("Usage: Loading...", callback=None)
-        self.domain_item = rumps.MenuItem("Domain: Loading...", callback=None)
-        self.expiry_item = rumps.MenuItem("Expires: Loading...", callback=None)
+        self.spend_item = rumps.MenuItem("Spend: Loading...", callback=self.do_nothing)
+        self.budget_item = rumps.MenuItem("Budget: Loading...", callback=self.do_nothing)
+        self.usage_item = rumps.MenuItem("Usage: Loading...", callback=self.do_nothing)
+        self.domain_item = rumps.MenuItem("Domain: Loading...", callback=self.do_nothing)
+        self.expiry_item = rumps.MenuItem("Expires: Loading...", callback=self.do_nothing)
 
         # Metadata items - will be populated dynamically
         self.metadata_items = []
@@ -129,7 +133,7 @@ class ClaudeSpendApp(rumps.App):
             metadata = info.get("metadata", {})
             if metadata:
                 for key, value in metadata.items():
-                    item = rumps.MenuItem(f"{key}: {value}", callback=None)
+                    item = rumps.MenuItem(f"{key}: {value}", callback=self.do_nothing)
                     self.metadata_items.append(item)
                     self.menu.insert_after("Metadata", item)
 

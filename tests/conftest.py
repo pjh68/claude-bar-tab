@@ -17,6 +17,15 @@ class MockMenuItem:
         self.title = title
         self.callback = callback
         self.state = False
+        self.hidden = False
+
+    def hide(self):
+        """Hide the menu item."""
+        self.hidden = True
+
+    def show(self):
+        """Show the menu item."""
+        self.hidden = False
 
 
 class MockTimer:

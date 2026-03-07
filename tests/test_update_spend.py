@@ -271,12 +271,14 @@ def test_update_spend_config_error(app, mock_load_settings, mock_fetch_data):
 
     assert app.title == "❋ Config"
     assert app.error_item.title == "⚠ Settings not found: ~/.claude/settings.json"
+    assert app.error_item.hidden == False
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
     assert app.domain_item.title == "Domain: Error"
     assert app.expiry_item.title == "Expires: Error"
     assert str(app.settings_path) in app.settings_file_item.title
+    assert app.settings_file_item.hidden == False
 
 
 def test_update_spend_auth_error(app, mock_load_settings, mock_fetch_data):
@@ -287,12 +289,14 @@ def test_update_spend_auth_error(app, mock_load_settings, mock_fetch_data):
 
     assert app.title == "❋ Auth"
     assert app.error_item.title == "⚠ Unauthorized (401)"
+    assert app.error_item.hidden == False
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
     assert app.domain_item.title == "Domain: api.example.com"
     assert app.expiry_item.title == "Expires: Error"
     assert str(app.settings_path) in app.settings_file_item.title
+    assert app.settings_file_item.hidden == False
 
 
 def test_update_spend_network_error(app, mock_load_settings, mock_fetch_data):
@@ -303,12 +307,14 @@ def test_update_spend_network_error(app, mock_load_settings, mock_fetch_data):
 
     assert app.title == "❋ Offline"
     assert app.error_item.title == "⚠ Connection timed out"
+    assert app.error_item.hidden == False
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
     assert app.domain_item.title == "Domain: api.example.com"
     assert app.expiry_item.title == "Expires: Error"
     assert str(app.settings_path) in app.settings_file_item.title
+    assert app.settings_file_item.hidden == False
 
 
 def test_update_spend_server_error(app, mock_load_settings, mock_fetch_data):
@@ -319,12 +325,14 @@ def test_update_spend_server_error(app, mock_load_settings, mock_fetch_data):
 
     assert app.title == "❋ Server"
     assert app.error_item.title == "⚠ Server error (500)"
+    assert app.error_item.hidden == False
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
     assert app.domain_item.title == "Domain: api.example.com"
     assert app.expiry_item.title == "Expires: Error"
     assert str(app.settings_path) in app.settings_file_item.title
+    assert app.settings_file_item.hidden == False
 
 
 def test_update_spend_data_error(app, mock_load_settings, mock_fetch_data):
@@ -335,12 +343,14 @@ def test_update_spend_data_error(app, mock_load_settings, mock_fetch_data):
 
     assert app.title == "❋ Data"
     assert app.error_item.title == "⚠ Unexpected response format"
+    assert app.error_item.hidden == False
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
     assert app.domain_item.title == "Domain: api.example.com"
     assert app.expiry_item.title == "Expires: Error"
     assert str(app.settings_path) in app.settings_file_item.title
+    assert app.settings_file_item.hidden == False
 
 
 def test_update_spend_generic_error(app, mock_load_settings, mock_fetch_data):
@@ -351,12 +361,14 @@ def test_update_spend_generic_error(app, mock_load_settings, mock_fetch_data):
 
     assert app.title == "❋ Error"
     assert app.error_item.title == "⚠ Unexpected error"
+    assert app.error_item.hidden == False
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
     assert app.domain_item.title == "Domain: api.example.com"
     assert app.expiry_item.title == "Expires: Error"
     assert str(app.settings_path) in app.settings_file_item.title
+    assert app.settings_file_item.hidden == False
 
 
 def test_update_spend_success_clears_error(app, mock_load_settings, mock_fetch_data):
@@ -370,8 +382,8 @@ def test_update_spend_success_clears_error(app, mock_load_settings, mock_fetch_d
 
     app.update_spend(None)
 
-    assert app.error_item.title == ""
-    assert app.settings_file_item.title == ""
+    assert app.error_item.hidden
+    assert app.settings_file_item.hidden
     assert app.title == "❋ $25.50"
 
 

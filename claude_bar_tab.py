@@ -60,6 +60,7 @@ class ClaudeSpendApp(rumps.App):
 
         # Create error display item (hidden by default)
         self.error_item = rumps.MenuItem("", callback=self.do_nothing)
+        self.error_item.hide()
 
         # Create menu structure with placeholders for spend info
         self.spend_item = rumps.MenuItem("Spend: Loading...", callback=self.do_nothing)
@@ -68,6 +69,7 @@ class ClaudeSpendApp(rumps.App):
         self.domain_item = rumps.MenuItem("Domain: Loading...", callback=self.do_nothing)
         self.expiry_item = rumps.MenuItem("Expires: Loading...", callback=self.do_nothing)
         self.settings_file_item = rumps.MenuItem("", callback=self.do_nothing)
+        self.settings_file_item.hide()
 
         # Metadata items - will be populated dynamically
         self.metadata_items = []
@@ -169,12 +171,14 @@ class ClaudeSpendApp(rumps.App):
         """Set menu items to error state."""
         self.title = f"❋ {title_suffix}"
         self.error_item.title = f"⚠ {error_message}"
+        self.error_item.show()
         self.spend_item.title = "Spend: Error"
         self.budget_item.title = "Budget: Error"
         self.usage_item.title = "Usage: Error"
         self.domain_item.title = domain_text
         self.expiry_item.title = "Expires: Error"
         self.settings_file_item.title = f"Settings: {self.settings_path}"
+        self.settings_file_item.show()
 
     @rumps.clicked("Refresh Now")
     def manual_refresh(self, _):
@@ -205,8 +209,8 @@ class ClaudeSpendApp(rumps.App):
             self.title = f"❋ ${spend:.2f}"
 
             # Clear error display and settings file item
-            self.error_item.title = ""
-            self.settings_file_item.title = ""
+            self.error_item.hide()
+            self.settings_file_item.hide()
 
             # Update menu items with detailed info
             self.spend_item.title = f"Spend: ${spend:.2f}"

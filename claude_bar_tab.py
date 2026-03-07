@@ -14,6 +14,39 @@ from urllib.parse import urlparse
 import rumps
 
 
+# Custom exception hierarchy for error categorization
+class AppError(Exception):
+    """Base class for application-specific errors."""
+    def __init__(self, user_message):
+        self.user_message = user_message
+        super().__init__(user_message)
+
+
+class ConfigError(AppError):
+    """Settings file issues (missing, malformed, missing keys)."""
+    pass
+
+
+class AuthError(AppError):
+    """Authentication/authorization errors (401, 403)."""
+    pass
+
+
+class NetworkError(AppError):
+    """Network connectivity issues (timeout, connection refused, DNS)."""
+    pass
+
+
+class ServerError(AppError):
+    """Server-side errors (5xx responses)."""
+    pass
+
+
+class DataError(AppError):
+    """Unexpected response format or missing data."""
+    pass
+
+
 class ClaudeSpendApp(rumps.App):
     def do_nothing(self, _):
         """Dummy callback to prevent menu items from being greyed out."""
@@ -21,6 +54,9 @@ class ClaudeSpendApp(rumps.App):
 
     def __init__(self):
         super(ClaudeSpendApp, self).__init__("❋", quit_button=None)
+
+        # Create error display item (hidden by default)
+        self.error_item = rumps.MenuItem("", callback=self.do_nothing)
 
         # Create menu structure with placeholders for spend info
         self.spend_item = rumps.MenuItem("Spend: Loading...", callback=self.do_nothing)
@@ -33,6 +69,8 @@ class ClaudeSpendApp(rumps.App):
         self.metadata_items = []
 
         self.menu = [
+            self.error_item,
+            None,  # Separator
             self.spend_item,
             self.budget_item,
             self.usage_item,
@@ -67,11 +105,24 @@ class ClaudeSpendApp(rumps.App):
         try:
             with open(settings_path) as f:
                 settings = json.load(f)
-                url = settings["env"]["ANTHROPIC_BASE_URL"]
-                key = settings["env"]["ANTHROPIC_AUTH_TOKEN"]
-                return url, key
-        except (FileNotFoundError, KeyError, json.JSONDecodeError) as e:
-            raise Exception(f"Failed to load settings from {settings_path}: {e}")
+        except FileNotFoundError:
+            raise ConfigError(f"Settings not found: {settings_path}")
+        except json.JSONDecodeError:
+            raise ConfigError("Settings file has invalid JSON")
+
+        try:
+            url = settings["env"]["ANTHROPIC_BASE_URL"]
+        except KeyError:
+            if "env" not in settings:
+                raise ConfigError("Missing key: env")
+            raise ConfigError("Missing key: ANTHROPIC_BASE_URL")
+
+        try:
+            key = settings["env"]["ANTHROPIC_AUTH_TOKEN"]
+        except KeyError:
+            raise ConfigError("Missing key: ANTHROPIC_AUTH_TOKEN")
+
+        return url, key
 
     def fetch_spend_info(self):
         """Fetch spend information from the API gateway."""
@@ -86,8 +137,25 @@ class ClaudeSpendApp(rumps.App):
             with urllib.request.urlopen(request, timeout=10) as response:
                 data = json.load(response)
                 return data["info"], url
+        except urllib.error.HTTPError as e:
+            if e.code == 401:
+                raise AuthError(f"Unauthorized ({e.code})")
+            elif e.code == 403:
+                raise AuthError(f"Forbidden ({e.code})")
+            elif 500 <= e.code < 600:
+                raise ServerError(f"Server error ({e.code})")
+            else:
+                raise ServerError(f"HTTP error ({e.code})")
         except urllib.error.URLError as e:
-            raise Exception(f"Failed to fetch spend info: {e}")
+            reason = str(e.reason)
+            if "timed out" in reason.lower():
+                raise NetworkError("Connection timed out")
+            elif isinstance(e.reason, ConnectionRefusedError):
+                raise NetworkError("Connection refused")
+            else:
+                raise NetworkError(reason)
+        except (KeyError, json.JSONDecodeError):
+            raise DataError("Unexpected response format")
 
     @rumps.clicked("Refresh Now")
     def manual_refresh(self, _):
@@ -104,6 +172,9 @@ class ClaudeSpendApp(rumps.App):
 
             # Update menu bar title
             self.title = f"❋ ${spend:.2f}"
+
+            # Clear error display
+            self.error_item.title = ""
 
             # Update menu items with detailed info
             self.spend_item.title = f"Spend: ${spend:.2f}"
@@ -137,14 +208,54 @@ class ClaudeSpendApp(rumps.App):
                     self.metadata_items.append(item)
                     self.menu.insert_after("Metadata", item)
 
-        except Exception as e:
-            self.title = "❋ Error"
+        except ConfigError as e:
+            self.title = "❋ Config"
+            self.error_item.title = f"⚠ {e.user_message}"
             self.spend_item.title = "Spend: Error"
             self.budget_item.title = "Budget: Error"
             self.usage_item.title = "Usage: Error"
             self.domain_item.title = "Domain: Error"
             self.expiry_item.title = "Expires: Error"
-            print(f"Error updating spend: {e}")
+        except AuthError as e:
+            self.title = "❋ Auth"
+            self.error_item.title = f"⚠ {e.user_message}"
+            self.spend_item.title = "Spend: Error"
+            self.budget_item.title = "Budget: Error"
+            self.usage_item.title = "Usage: Error"
+            self.domain_item.title = "Domain: Error"
+            self.expiry_item.title = "Expires: Error"
+        except NetworkError as e:
+            self.title = "❋ Offline"
+            self.error_item.title = f"⚠ {e.user_message}"
+            self.spend_item.title = "Spend: Error"
+            self.budget_item.title = "Budget: Error"
+            self.usage_item.title = "Usage: Error"
+            self.domain_item.title = "Domain: Error"
+            self.expiry_item.title = "Expires: Error"
+        except ServerError as e:
+            self.title = "❋ Server"
+            self.error_item.title = f"⚠ {e.user_message}"
+            self.spend_item.title = "Spend: Error"
+            self.budget_item.title = "Budget: Error"
+            self.usage_item.title = "Usage: Error"
+            self.domain_item.title = "Domain: Error"
+            self.expiry_item.title = "Expires: Error"
+        except DataError as e:
+            self.title = "❋ Data"
+            self.error_item.title = f"⚠ {e.user_message}"
+            self.spend_item.title = "Spend: Error"
+            self.budget_item.title = "Budget: Error"
+            self.usage_item.title = "Usage: Error"
+            self.domain_item.title = "Domain: Error"
+            self.expiry_item.title = "Expires: Error"
+        except Exception as e:
+            self.title = "❋ Error"
+            self.error_item.title = f"⚠ {str(e)}"
+            self.spend_item.title = "Spend: Error"
+            self.budget_item.title = "Budget: Error"
+            self.usage_item.title = "Usage: Error"
+            self.domain_item.title = "Domain: Error"
+            self.expiry_item.title = "Expires: Error"
 
     def set_interval_5(self, sender):
         """Set refresh interval to 5 minutes."""

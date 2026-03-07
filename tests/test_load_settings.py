@@ -8,6 +8,7 @@ import json
 import pytest
 from unittest.mock import mock_open, patch
 from pathlib import Path
+from claude_bar_tab import ConfigError
 
 
 def test_load_settings_success(app):
@@ -28,41 +29,41 @@ def test_load_settings_success(app):
 
 
 def test_load_settings_file_not_found(app):
-    """Missing file raises Exception."""
+    """Missing file raises ConfigError."""
     with patch("builtins.open", side_effect=FileNotFoundError()):
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(ConfigError) as exc_info:
             app.load_settings()
 
-    assert "Failed to load settings" in str(exc_info.value)
+    assert "Settings not found" in str(exc_info.value)
 
 
 def test_load_settings_malformed_json(app):
-    """Invalid JSON raises Exception."""
+    """Invalid JSON raises ConfigError."""
     m = mock_open(read_data="{not valid json")
 
     with patch("builtins.open", m):
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(ConfigError) as exc_info:
             app.load_settings()
 
-    assert "Failed to load settings" in str(exc_info.value)
+    assert "invalid JSON" in str(exc_info.value)
 
 
 def test_load_settings_missing_env_key(app):
-    """No env key raises Exception."""
+    """No env key raises ConfigError."""
     settings_data = {
         "other_key": "value"
     }
 
     m = mock_open(read_data=json.dumps(settings_data))
     with patch("builtins.open", m):
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(ConfigError) as exc_info:
             app.load_settings()
 
-    assert "Failed to load settings" in str(exc_info.value)
+    assert "Missing key: env" in str(exc_info.value)
 
 
 def test_load_settings_missing_base_url(app):
-    """No ANTHROPIC_BASE_URL raises Exception."""
+    """No ANTHROPIC_BASE_URL raises ConfigError."""
     settings_data = {
         "env": {
             "ANTHROPIC_AUTH_TOKEN": "test-token-123"
@@ -71,14 +72,14 @@ def test_load_settings_missing_base_url(app):
 
     m = mock_open(read_data=json.dumps(settings_data))
     with patch("builtins.open", m):
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(ConfigError) as exc_info:
             app.load_settings()
 
-    assert "Failed to load settings" in str(exc_info.value)
+    assert "Missing key: ANTHROPIC_BASE_URL" in str(exc_info.value)
 
 
 def test_load_settings_missing_auth_token(app):
-    """No ANTHROPIC_AUTH_TOKEN raises Exception."""
+    """No ANTHROPIC_AUTH_TOKEN raises ConfigError."""
     settings_data = {
         "env": {
             "ANTHROPIC_BASE_URL": "https://api.example.com"
@@ -87,10 +88,10 @@ def test_load_settings_missing_auth_token(app):
 
     m = mock_open(read_data=json.dumps(settings_data))
     with patch("builtins.open", m):
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(ConfigError) as exc_info:
             app.load_settings()
 
-    assert "Failed to load settings" in str(exc_info.value)
+    assert "Missing key: ANTHROPIC_AUTH_TOKEN" in str(exc_info.value)
 
 
 def test_load_settings_uses_correct_path(app):

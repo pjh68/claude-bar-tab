@@ -9,6 +9,7 @@ import urllib.error
 import pytest
 from unittest.mock import patch, MagicMock
 from io import BytesIO
+from claude_bar_tab import AuthError, NetworkError, ServerError, DataError
 
 
 @pytest.fixture
@@ -75,7 +76,7 @@ def test_fetch_spend_info_timeout_is_10(app, mock_settings):
 
 
 def test_fetch_spend_info_http_401(app, mock_settings):
-    """401 Unauthorized raises Exception."""
+    """401 Unauthorized raises AuthError."""
     error = urllib.error.HTTPError(
         "https://api.example.com/key/info",
         401,
@@ -85,14 +86,14 @@ def test_fetch_spend_info_http_401(app, mock_settings):
     )
 
     with patch("urllib.request.urlopen", side_effect=error):
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(AuthError) as exc_info:
             app.fetch_spend_info()
 
-    assert "Failed to fetch spend info" in str(exc_info.value)
+    assert "Unauthorized (401)" in str(exc_info.value)
 
 
 def test_fetch_spend_info_http_403(app, mock_settings):
-    """403 Forbidden raises Exception."""
+    """403 Forbidden raises AuthError."""
     error = urllib.error.HTTPError(
         "https://api.example.com/key/info",
         403,
@@ -102,14 +103,14 @@ def test_fetch_spend_info_http_403(app, mock_settings):
     )
 
     with patch("urllib.request.urlopen", side_effect=error):
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(AuthError) as exc_info:
             app.fetch_spend_info()
 
-    assert "Failed to fetch spend info" in str(exc_info.value)
+    assert "Forbidden (403)" in str(exc_info.value)
 
 
 def test_fetch_spend_info_http_404(app, mock_settings):
-    """404 Not Found raises Exception."""
+    """404 Not Found raises ServerError."""
     error = urllib.error.HTTPError(
         "https://api.example.com/key/info",
         404,
@@ -119,14 +120,14 @@ def test_fetch_spend_info_http_404(app, mock_settings):
     )
 
     with patch("urllib.request.urlopen", side_effect=error):
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(ServerError) as exc_info:
             app.fetch_spend_info()
 
-    assert "Failed to fetch spend info" in str(exc_info.value)
+    assert "HTTP error (404)" in str(exc_info.value)
 
 
 def test_fetch_spend_info_http_500(app, mock_settings):
-    """500 Internal Server Error raises Exception."""
+    """500 Internal Server Error raises ServerError."""
     error = urllib.error.HTTPError(
         "https://api.example.com/key/info",
         500,
@@ -136,32 +137,62 @@ def test_fetch_spend_info_http_500(app, mock_settings):
     )
 
     with patch("urllib.request.urlopen", side_effect=error):
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(ServerError) as exc_info:
             app.fetch_spend_info()
 
-    assert "Failed to fetch spend info" in str(exc_info.value)
+    assert "Server error (500)" in str(exc_info.value)
 
 
 def test_fetch_spend_info_network_timeout(app, mock_settings):
-    """URLError("timed out") raises Exception."""
+    """URLError("timed out") raises NetworkError."""
     error = urllib.error.URLError("timed out")
 
     with patch("urllib.request.urlopen", side_effect=error):
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(NetworkError) as exc_info:
             app.fetch_spend_info()
 
-    assert "Failed to fetch spend info" in str(exc_info.value)
+    assert "Connection timed out" in str(exc_info.value)
 
 
 def test_fetch_spend_info_connection_refused(app, mock_settings):
-    """URLError(ConnectionRefusedError) raises Exception."""
+    """URLError(ConnectionRefusedError) raises NetworkError."""
     error = urllib.error.URLError(ConnectionRefusedError())
 
     with patch("urllib.request.urlopen", side_effect=error):
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(NetworkError) as exc_info:
             app.fetch_spend_info()
 
-    assert "Failed to fetch spend info" in str(exc_info.value)
+    assert "Connection refused" in str(exc_info.value)
+
+
+def test_fetch_spend_info_missing_info_key(app, mock_settings):
+    """Response missing 'info' key raises DataError."""
+    response_data = {
+        "wrong_key": "value"
+    }
+
+    mock_response = MagicMock()
+    mock_response.__enter__ = MagicMock(return_value=BytesIO(json.dumps(response_data).encode()))
+    mock_response.__exit__ = MagicMock(return_value=False)
+
+    with patch("urllib.request.urlopen", return_value=mock_response):
+        with pytest.raises(DataError) as exc_info:
+            app.fetch_spend_info()
+
+    assert "Unexpected response format" in str(exc_info.value)
+
+
+def test_fetch_spend_info_invalid_json_response(app, mock_settings):
+    """Invalid JSON response raises DataError."""
+    mock_response = MagicMock()
+    mock_response.__enter__ = MagicMock(return_value=BytesIO(b"{not valid json"))
+    mock_response.__exit__ = MagicMock(return_value=False)
+
+    with patch("urllib.request.urlopen", return_value=mock_response):
+        with pytest.raises(DataError) as exc_info:
+            app.fetch_spend_info()
+
+    assert "Unexpected response format" in str(exc_info.value)
 
 
 def test_fetch_spend_info_settings_failure_propagates(app):

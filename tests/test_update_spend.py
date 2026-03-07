@@ -7,6 +7,7 @@ Tests verify response parsing, menu item updates, and error handling.
 import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
+from claude_bar_tab import ConfigError, AuthError, NetworkError, ServerError, DataError
 
 
 @pytest.fixture
@@ -252,12 +253,14 @@ def test_update_spend_metadata_missing(app, mock_fetch):
     assert len(app.metadata_items) == 0
 
 
-def test_update_spend_error_sets_all_error(app, mock_fetch):
-    """All menu items set to 'Error' on failure."""
-    mock_fetch.side_effect = Exception("Network error")
+def test_update_spend_config_error(app, mock_fetch):
+    """ConfigError shows '❋ Config' title and error detail."""
+    mock_fetch.side_effect = ConfigError("Settings not found: ~/.claude/settings.json")
 
     app.update_spend(None)
 
+    assert app.title == "❋ Config"
+    assert app.error_item.title == "⚠ Settings not found: ~/.claude/settings.json"
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
@@ -265,24 +268,94 @@ def test_update_spend_error_sets_all_error(app, mock_fetch):
     assert app.expiry_item.title == "Expires: Error"
 
 
-def test_update_spend_error_title(app, mock_fetch):
-    """App title set to '❋ Error' on failure."""
-    mock_fetch.side_effect = Exception("Network error")
+def test_update_spend_auth_error(app, mock_fetch):
+    """AuthError shows '❋ Auth' title and error detail."""
+    mock_fetch.side_effect = AuthError("Unauthorized (401)")
+
+    app.update_spend(None)
+
+    assert app.title == "❋ Auth"
+    assert app.error_item.title == "⚠ Unauthorized (401)"
+    assert app.spend_item.title == "Spend: Error"
+    assert app.budget_item.title == "Budget: Error"
+    assert app.usage_item.title == "Usage: Error"
+    assert app.domain_item.title == "Domain: Error"
+    assert app.expiry_item.title == "Expires: Error"
+
+
+def test_update_spend_network_error(app, mock_fetch):
+    """NetworkError shows '❋ Offline' title and error detail."""
+    mock_fetch.side_effect = NetworkError("Connection timed out")
+
+    app.update_spend(None)
+
+    assert app.title == "❋ Offline"
+    assert app.error_item.title == "⚠ Connection timed out"
+    assert app.spend_item.title == "Spend: Error"
+    assert app.budget_item.title == "Budget: Error"
+    assert app.usage_item.title == "Usage: Error"
+    assert app.domain_item.title == "Domain: Error"
+    assert app.expiry_item.title == "Expires: Error"
+
+
+def test_update_spend_server_error(app, mock_fetch):
+    """ServerError shows '❋ Server' title and error detail."""
+    mock_fetch.side_effect = ServerError("Server error (500)")
+
+    app.update_spend(None)
+
+    assert app.title == "❋ Server"
+    assert app.error_item.title == "⚠ Server error (500)"
+    assert app.spend_item.title == "Spend: Error"
+    assert app.budget_item.title == "Budget: Error"
+    assert app.usage_item.title == "Usage: Error"
+    assert app.domain_item.title == "Domain: Error"
+    assert app.expiry_item.title == "Expires: Error"
+
+
+def test_update_spend_data_error(app, mock_fetch):
+    """DataError shows '❋ Data' title and error detail."""
+    mock_fetch.side_effect = DataError("Unexpected response format")
+
+    app.update_spend(None)
+
+    assert app.title == "❋ Data"
+    assert app.error_item.title == "⚠ Unexpected response format"
+    assert app.spend_item.title == "Spend: Error"
+    assert app.budget_item.title == "Budget: Error"
+    assert app.usage_item.title == "Usage: Error"
+    assert app.domain_item.title == "Domain: Error"
+    assert app.expiry_item.title == "Expires: Error"
+
+
+def test_update_spend_generic_error(app, mock_fetch):
+    """Unexpected exception shows '❋ Error' title and error detail."""
+    mock_fetch.side_effect = Exception("Unexpected error")
 
     app.update_spend(None)
 
     assert app.title == "❋ Error"
+    assert app.error_item.title == "⚠ Unexpected error"
+    assert app.spend_item.title == "Spend: Error"
+    assert app.budget_item.title == "Budget: Error"
+    assert app.usage_item.title == "Usage: Error"
+    assert app.domain_item.title == "Domain: Error"
+    assert app.expiry_item.title == "Expires: Error"
 
 
-def test_update_spend_error_prints_message(app, mock_fetch, capsys):
-    """Error message printed via print()."""
-    mock_fetch.side_effect = Exception("Network error")
+def test_update_spend_success_clears_error(app, mock_fetch):
+    """Successful update clears error_item."""
+    info = {
+        "spend": 25.50,
+        "max_budget": 100.00,
+        "expires": "2026-12-31T23:59:59"
+    }
+    mock_fetch.return_value = (info, "https://api.example.com")
 
     app.update_spend(None)
 
-    captured = capsys.readouterr()
-    assert "Error updating spend" in captured.out
-    assert "Network error" in captured.out
+    assert app.error_item.title == ""
+    assert app.title == "❋ $25.50"
 
 
 def test_update_spend_large_spend_formatting(app, mock_fetch):

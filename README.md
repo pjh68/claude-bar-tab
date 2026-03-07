@@ -19,7 +19,7 @@ A macOS menu bar widget that displays your Claude API Gateway spend information.
 
 ### Option 1: Standalone App (Recommended)
 
-Build a standalone macOS application that doesn't require Python to be installed:
+Build and install a standalone macOS application:
 
 1. Clone this repository and navigate to it:
 ```bash
@@ -32,32 +32,19 @@ cd claude-bar-tab
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-pip install py2app
 ```
 
-3. Build the app:
+3. Build and install the app:
 ```bash
-python setup.py py2app
+./install.sh
 ```
 
-4. Install the app:
-```bash
-cp -r "dist/Claude Bar Tab.app" /Applications/
-```
-
-5. Launch the app:
+4. Launch the app:
 ```bash
 open "/Applications/Claude Bar Tab.app"
 ```
 
-The app runs as a menu bar-only application (no dock icon) and includes all dependencies.
-
-**To rebuild after making changes:**
-```bash
-source venv/bin/activate
-rm -rf build dist
-python setup.py py2app
-```
+The app runs as a menu bar-only application (no dock icon) and includes all dependencies. The install.sh script handles building with py2app and copying to /Applications automatically.
 
 ### Option 2: Run from Python Script
 

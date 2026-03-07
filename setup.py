@@ -27,8 +27,4 @@ setup(
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
     py_modules=['claude_bar_tab'],
-    install_requires=['rumps==0.4.0'],
-    extras_require={
-        'dev': ['pytest'],
-    },
 )

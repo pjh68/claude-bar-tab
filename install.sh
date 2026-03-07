@@ -16,21 +16,24 @@ if [ ! -f "setup.py" ]; then
     exit 1
 fi
 
+# Create virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv venv
+fi
+
+# Activate virtual environment
+echo "Activating virtual environment..."
+source venv/bin/activate
+
+# Install dependencies
+echo "Installing dependencies..."
+pip install -q -r requirements.txt
+pip install -q py2app
+
 # Clean previous build
 echo "Cleaning previous build..."
 rm -rf build dist
-
-# Activate virtual environment if it exists
-if [ -d "venv" ]; then
-    echo "Activating virtual environment..."
-    source venv/bin/activate
-else
-    echo "Warning: Virtual environment not found. Using system Python."
-fi
-
-# Ensure py2app is installed
-echo "Ensuring py2app is installed..."
-pip install -q py2app
 
 # Build the app
 echo "Building Claude Bar Tab.app..."

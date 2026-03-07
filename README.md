@@ -91,36 +91,6 @@ The widget will appear in your menu bar showing your current spend (e.g., "❋ $
 3. Navigate to `/Applications/` and select **Claude Bar Tab**
 4. The app will now start automatically when you log in
 
-### For Python Script
-
-Create `~/Library/LaunchAgents/com.claude.bartab.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.claude.bartab</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/python3</string>
-        <string>/Users/YOUR_USERNAME/git/claude-bar-tab/claude_bar_tab.py</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-</dict>
-</plist>
-```
-
-Replace `YOUR_USERNAME` with your actual username, then:
-
-```bash
-launchctl load ~/Library/LaunchAgents/com.claude.bartab.plist
-```
-
 ## Configuration
 
 The app reads your API credentials from `~/.claude/settings.json`:

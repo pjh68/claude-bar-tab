@@ -55,6 +55,9 @@ class ClaudeSpendApp(rumps.App):
     def __init__(self):
         super(ClaudeSpendApp, self).__init__("❋", quit_button=None)
 
+        # Settings file path
+        self.settings_path = Path.home() / ".claude" / "settings.json"
+
         # Create error display item (hidden by default)
         self.error_item = rumps.MenuItem("", callback=self.do_nothing)
 
@@ -64,6 +67,7 @@ class ClaudeSpendApp(rumps.App):
         self.usage_item = rumps.MenuItem("Usage: Loading...", callback=self.do_nothing)
         self.domain_item = rumps.MenuItem("Domain: Loading...", callback=self.do_nothing)
         self.expiry_item = rumps.MenuItem("Expires: Loading...", callback=self.do_nothing)
+        self.settings_file_item = rumps.MenuItem("", callback=self.do_nothing)
 
         # Metadata items - will be populated dynamically
         self.metadata_items = []
@@ -77,6 +81,7 @@ class ClaudeSpendApp(rumps.App):
             self.expiry_item,
             None,  # Separator
             self.domain_item,
+            self.settings_file_item,
             None,  # Separator (metadata will be inserted here)
             "Metadata",
             None,  # Separator
@@ -101,12 +106,11 @@ class ClaudeSpendApp(rumps.App):
 
     def load_settings(self):
         """Load settings from Claude settings file."""
-        settings_path = Path.home() / ".claude" / "settings.json"
         try:
-            with open(settings_path) as f:
+            with open(self.settings_path) as f:
                 settings = json.load(f)
         except FileNotFoundError:
-            raise ConfigError(f"Settings not found: {settings_path}")
+            raise ConfigError(f"Settings not found: {self.settings_path}")
         except json.JSONDecodeError:
             raise ConfigError("Settings file has invalid JSON")
 
@@ -124,10 +128,8 @@ class ClaudeSpendApp(rumps.App):
 
         return url, key
 
-    def fetch_spend_info(self):
-        """Fetch spend information from the API gateway."""
-        url, key = self.load_settings()
-
+    def fetch_spend_data(self, url, key):
+        """Fetch spend data from the API gateway."""
         request = urllib.request.Request(
             f"{url}/key/info",
             headers={"Authorization": f"Bearer {key}"}
@@ -136,7 +138,7 @@ class ClaudeSpendApp(rumps.App):
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
                 data = json.load(response)
-                return data["info"], url
+                return data["info"]
         except urllib.error.HTTPError as e:
             if e.code == 401:
                 raise AuthError(f"Unauthorized ({e.code})")
@@ -157,6 +159,23 @@ class ClaudeSpendApp(rumps.App):
         except (KeyError, json.JSONDecodeError):
             raise DataError("Unexpected response format")
 
+    def fetch_spend_info(self):
+        """Fetch spend information from the API gateway."""
+        url, key = self.load_settings()
+        info = self.fetch_spend_data(url, key)
+        return info, url
+
+    def _set_error_state(self, title_suffix, error_message, domain_text="Domain: Error"):
+        """Set menu items to error state."""
+        self.title = f"❋ {title_suffix}"
+        self.error_item.title = f"⚠ {error_message}"
+        self.spend_item.title = "Spend: Error"
+        self.budget_item.title = "Budget: Error"
+        self.usage_item.title = "Usage: Error"
+        self.domain_item.title = domain_text
+        self.expiry_item.title = "Expires: Error"
+        self.settings_file_item.title = f"Settings: {self.settings_path}"
+
     @rumps.clicked("Refresh Now")
     def manual_refresh(self, _):
         """Manual refresh triggered by menu click."""
@@ -164,8 +183,20 @@ class ClaudeSpendApp(rumps.App):
 
     def update_spend(self, _):
         """Update the menu bar with current spend information."""
+        # Phase 1: Try to load settings
         try:
-            info, base_url = self.fetch_spend_info()
+            url, key = self.load_settings()
+        except ConfigError as e:
+            # Settings failed to load - domain is unavailable
+            self._set_error_state("Config", e.user_message, "Domain: Error")
+            return
+
+        # Phase 2: Settings loaded successfully, domain is known
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc
+
+        try:
+            info = self.fetch_spend_data(url, key)
             spend = info["spend"]
             max_budget = info["max_budget"]
             pct = (spend / max_budget * 100) if max_budget > 0 else 0
@@ -173,8 +204,9 @@ class ClaudeSpendApp(rumps.App):
             # Update menu bar title
             self.title = f"❋ ${spend:.2f}"
 
-            # Clear error display
+            # Clear error display and settings file item
             self.error_item.title = ""
+            self.settings_file_item.title = ""
 
             # Update menu items with detailed info
             self.spend_item.title = f"Spend: ${spend:.2f}"
@@ -182,8 +214,7 @@ class ClaudeSpendApp(rumps.App):
             self.usage_item.title = f"Usage: {pct:.1f}%"
 
             # Update domain
-            parsed_url = urlparse(base_url)
-            self.domain_item.title = f"Domain: {parsed_url.netloc}"
+            self.domain_item.title = f"Domain: {domain}"
 
             # Update expiry - calculate days until expiration
             expires_str = info.get("expires", "")
@@ -208,54 +239,16 @@ class ClaudeSpendApp(rumps.App):
                     self.metadata_items.append(item)
                     self.menu.insert_after("Metadata", item)
 
-        except ConfigError as e:
-            self.title = "❋ Config"
-            self.error_item.title = f"⚠ {e.user_message}"
-            self.spend_item.title = "Spend: Error"
-            self.budget_item.title = "Budget: Error"
-            self.usage_item.title = "Usage: Error"
-            self.domain_item.title = "Domain: Error"
-            self.expiry_item.title = "Expires: Error"
         except AuthError as e:
-            self.title = "❋ Auth"
-            self.error_item.title = f"⚠ {e.user_message}"
-            self.spend_item.title = "Spend: Error"
-            self.budget_item.title = "Budget: Error"
-            self.usage_item.title = "Usage: Error"
-            self.domain_item.title = "Domain: Error"
-            self.expiry_item.title = "Expires: Error"
+            self._set_error_state("Auth", e.user_message, f"Domain: {domain}")
         except NetworkError as e:
-            self.title = "❋ Offline"
-            self.error_item.title = f"⚠ {e.user_message}"
-            self.spend_item.title = "Spend: Error"
-            self.budget_item.title = "Budget: Error"
-            self.usage_item.title = "Usage: Error"
-            self.domain_item.title = "Domain: Error"
-            self.expiry_item.title = "Expires: Error"
+            self._set_error_state("Offline", e.user_message, f"Domain: {domain}")
         except ServerError as e:
-            self.title = "❋ Server"
-            self.error_item.title = f"⚠ {e.user_message}"
-            self.spend_item.title = "Spend: Error"
-            self.budget_item.title = "Budget: Error"
-            self.usage_item.title = "Usage: Error"
-            self.domain_item.title = "Domain: Error"
-            self.expiry_item.title = "Expires: Error"
+            self._set_error_state("Server", e.user_message, f"Domain: {domain}")
         except DataError as e:
-            self.title = "❋ Data"
-            self.error_item.title = f"⚠ {e.user_message}"
-            self.spend_item.title = "Spend: Error"
-            self.budget_item.title = "Budget: Error"
-            self.usage_item.title = "Usage: Error"
-            self.domain_item.title = "Domain: Error"
-            self.expiry_item.title = "Expires: Error"
+            self._set_error_state("Data", e.user_message, f"Domain: {domain}")
         except Exception as e:
-            self.title = "❋ Error"
-            self.error_item.title = f"⚠ {str(e)}"
-            self.spend_item.title = "Spend: Error"
-            self.budget_item.title = "Budget: Error"
-            self.usage_item.title = "Usage: Error"
-            self.domain_item.title = "Domain: Error"
-            self.expiry_item.title = "Expires: Error"
+            self._set_error_state("Error", str(e), f"Domain: {domain}")
 
     def set_interval_5(self, sender):
         """Set refresh interval to 5 minutes."""

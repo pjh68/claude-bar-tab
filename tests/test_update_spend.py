@@ -11,20 +11,28 @@ from claude_bar_tab import ConfigError, AuthError, NetworkError, ServerError, Da
 
 
 @pytest.fixture
-def mock_fetch():
-    """Fixture to mock fetch_spend_info."""
-    with patch("claude_bar_tab.ClaudeSpendApp.fetch_spend_info") as mock:
+def mock_load_settings():
+    """Fixture to mock load_settings."""
+    with patch("claude_bar_tab.ClaudeSpendApp.load_settings") as mock:
+        mock.return_value = ("https://api.example.com", "token")
         yield mock
 
 
-def test_update_spend_typical_data(app, mock_fetch):
+@pytest.fixture
+def mock_fetch_data():
+    """Fixture to mock fetch_spend_data."""
+    with patch("claude_bar_tab.ClaudeSpendApp.fetch_spend_data") as mock:
+        yield mock
+
+
+def test_update_spend_typical_data(app, mock_load_settings, mock_fetch_data):
     """Correct title, spend, budget, usage, domain."""
     info = {
         "spend": 25.50,
         "max_budget": 100.00,
         "expires": "2026-12-31T23:59:59"
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
@@ -35,28 +43,28 @@ def test_update_spend_typical_data(app, mock_fetch):
     assert app.domain_item.title == "Domain: api.example.com"
 
 
-def test_update_spend_zero_budget(app, mock_fetch):
+def test_update_spend_zero_budget(app, mock_load_settings, mock_fetch_data):
     """No ZeroDivisionError; usage shows 0.0%."""
     info = {
         "spend": 10.00,
         "max_budget": 0.00,
         "expires": "2026-12-31T23:59:59"
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
     assert app.usage_item.title == "Usage: 0.0%"
 
 
-def test_update_spend_zero_spend_zero_budget(app, mock_fetch):
+def test_update_spend_zero_spend_zero_budget(app, mock_load_settings, mock_fetch_data):
     """Both zero handled correctly."""
     info = {
         "spend": 0.00,
         "max_budget": 0.00,
         "expires": "2026-12-31T23:59:59"
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
@@ -66,63 +74,65 @@ def test_update_spend_zero_spend_zero_budget(app, mock_fetch):
     assert app.usage_item.title == "Usage: 0.0%"
 
 
-def test_update_spend_full_budget(app, mock_fetch):
+def test_update_spend_full_budget(app, mock_load_settings, mock_fetch_data):
     """100% usage displayed."""
     info = {
         "spend": 100.00,
         "max_budget": 100.00,
         "expires": "2026-12-31T23:59:59"
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
     assert app.usage_item.title == "Usage: 100.0%"
 
 
-def test_update_spend_over_budget(app, mock_fetch):
+def test_update_spend_over_budget(app, mock_load_settings, mock_fetch_data):
     """>100% usage displayed."""
     info = {
         "spend": 150.00,
         "max_budget": 100.00,
         "expires": "2026-12-31T23:59:59"
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
     assert app.usage_item.title == "Usage: 150.0%"
 
 
-def test_update_spend_domain_parsing(app, mock_fetch):
+def test_update_spend_domain_parsing(app, mock_load_settings, mock_fetch_data):
     """Domain extracted from URL."""
+    mock_load_settings.return_value = ("https://my-gateway.example.com", "token")
     info = {
         "spend": 10.00,
         "max_budget": 100.00,
         "expires": "2026-12-31T23:59:59"
     }
-    mock_fetch.return_value = (info, "https://my-gateway.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
     assert app.domain_item.title == "Domain: my-gateway.example.com"
 
 
-def test_update_spend_domain_with_port(app, mock_fetch):
+def test_update_spend_domain_with_port(app, mock_load_settings, mock_fetch_data):
     """Port included in domain display."""
+    mock_load_settings.return_value = ("https://localhost:8080", "token")
     info = {
         "spend": 10.00,
         "max_budget": 100.00,
         "expires": "2026-12-31T23:59:59"
     }
-    mock_fetch.return_value = (info, "https://localhost:8080")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
     assert app.domain_item.title == "Domain: localhost:8080"
 
 
-def test_update_spend_expiry_future(app, mock_fetch):
+def test_update_spend_expiry_future(app, mock_load_settings, mock_fetch_data):
     """Days until expiry calculated."""
     # Set expiry to 30 days from now
     future_date = datetime.now() + timedelta(days=30)
@@ -133,7 +143,7 @@ def test_update_spend_expiry_future(app, mock_fetch):
         "max_budget": 100.00,
         "expires": expires_str
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
@@ -141,7 +151,7 @@ def test_update_spend_expiry_future(app, mock_fetch):
     assert "29d" in app.expiry_item.title or "30d" in app.expiry_item.title
 
 
-def test_update_spend_expiry_past(app, mock_fetch):
+def test_update_spend_expiry_past(app, mock_load_settings, mock_fetch_data):
     """Negative days shown for past expiry."""
     # Set expiry to 10 days ago
     past_date = datetime.now() - timedelta(days=10)
@@ -152,7 +162,7 @@ def test_update_spend_expiry_past(app, mock_fetch):
         "max_budget": 100.00,
         "expires": expires_str
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
@@ -160,34 +170,34 @@ def test_update_spend_expiry_past(app, mock_fetch):
     assert "-11d" in app.expiry_item.title or "-10d" in app.expiry_item.title or "-9d" in app.expiry_item.title
 
 
-def test_update_spend_expiry_missing(app, mock_fetch):
+def test_update_spend_expiry_missing(app, mock_load_settings, mock_fetch_data):
     """Shows 'Unknown' when no expires field."""
     info = {
         "spend": 10.00,
         "max_budget": 100.00
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
     assert app.expiry_item.title == "Expires: Unknown"
 
 
-def test_update_spend_expiry_empty_string(app, mock_fetch):
+def test_update_spend_expiry_empty_string(app, mock_load_settings, mock_fetch_data):
     """Shows 'Unknown' for empty string."""
     info = {
         "spend": 10.00,
         "max_budget": 100.00,
         "expires": ""
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
     assert app.expiry_item.title == "Expires: Unknown"
 
 
-def test_update_spend_metadata_single_entry(app, mock_fetch):
+def test_update_spend_metadata_single_entry(app, mock_load_settings, mock_fetch_data):
     """Single metadata item created."""
     info = {
         "spend": 10.00,
@@ -196,7 +206,7 @@ def test_update_spend_metadata_single_entry(app, mock_fetch):
             "key_name": "my-key"
         }
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
@@ -204,7 +214,7 @@ def test_update_spend_metadata_single_entry(app, mock_fetch):
     assert app.metadata_items[0].title == "key_name: my-key"
 
 
-def test_update_spend_metadata_multiple_entries(app, mock_fetch):
+def test_update_spend_metadata_multiple_entries(app, mock_load_settings, mock_fetch_data):
     """Multiple metadata items created."""
     info = {
         "spend": 10.00,
@@ -215,7 +225,7 @@ def test_update_spend_metadata_multiple_entries(app, mock_fetch):
             "tier": "pro"
         }
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
@@ -226,36 +236,36 @@ def test_update_spend_metadata_multiple_entries(app, mock_fetch):
     assert "tier: pro" in titles
 
 
-def test_update_spend_metadata_empty_dict(app, mock_fetch):
+def test_update_spend_metadata_empty_dict(app, mock_load_settings, mock_fetch_data):
     """No metadata items for empty dict."""
     info = {
         "spend": 10.00,
         "max_budget": 100.00,
         "metadata": {}
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
     assert len(app.metadata_items) == 0
 
 
-def test_update_spend_metadata_missing(app, mock_fetch):
+def test_update_spend_metadata_missing(app, mock_load_settings, mock_fetch_data):
     """No metadata items when key absent."""
     info = {
         "spend": 10.00,
         "max_budget": 100.00
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
     assert len(app.metadata_items) == 0
 
 
-def test_update_spend_config_error(app, mock_fetch):
+def test_update_spend_config_error(app, mock_load_settings, mock_fetch_data):
     """ConfigError shows '❋ Config' title and error detail."""
-    mock_fetch.side_effect = ConfigError("Settings not found: ~/.claude/settings.json")
+    mock_load_settings.side_effect = ConfigError("Settings not found: ~/.claude/settings.json")
 
     app.update_spend(None)
 
@@ -266,11 +276,12 @@ def test_update_spend_config_error(app, mock_fetch):
     assert app.usage_item.title == "Usage: Error"
     assert app.domain_item.title == "Domain: Error"
     assert app.expiry_item.title == "Expires: Error"
+    assert str(app.settings_path) in app.settings_file_item.title
 
 
-def test_update_spend_auth_error(app, mock_fetch):
+def test_update_spend_auth_error(app, mock_load_settings, mock_fetch_data):
     """AuthError shows '❋ Auth' title and error detail."""
-    mock_fetch.side_effect = AuthError("Unauthorized (401)")
+    mock_fetch_data.side_effect = AuthError("Unauthorized (401)")
 
     app.update_spend(None)
 
@@ -279,13 +290,14 @@ def test_update_spend_auth_error(app, mock_fetch):
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
-    assert app.domain_item.title == "Domain: Error"
+    assert app.domain_item.title == "Domain: api.example.com"
     assert app.expiry_item.title == "Expires: Error"
+    assert str(app.settings_path) in app.settings_file_item.title
 
 
-def test_update_spend_network_error(app, mock_fetch):
+def test_update_spend_network_error(app, mock_load_settings, mock_fetch_data):
     """NetworkError shows '❋ Offline' title and error detail."""
-    mock_fetch.side_effect = NetworkError("Connection timed out")
+    mock_fetch_data.side_effect = NetworkError("Connection timed out")
 
     app.update_spend(None)
 
@@ -294,13 +306,14 @@ def test_update_spend_network_error(app, mock_fetch):
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
-    assert app.domain_item.title == "Domain: Error"
+    assert app.domain_item.title == "Domain: api.example.com"
     assert app.expiry_item.title == "Expires: Error"
+    assert str(app.settings_path) in app.settings_file_item.title
 
 
-def test_update_spend_server_error(app, mock_fetch):
+def test_update_spend_server_error(app, mock_load_settings, mock_fetch_data):
     """ServerError shows '❋ Server' title and error detail."""
-    mock_fetch.side_effect = ServerError("Server error (500)")
+    mock_fetch_data.side_effect = ServerError("Server error (500)")
 
     app.update_spend(None)
 
@@ -309,13 +322,14 @@ def test_update_spend_server_error(app, mock_fetch):
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
-    assert app.domain_item.title == "Domain: Error"
+    assert app.domain_item.title == "Domain: api.example.com"
     assert app.expiry_item.title == "Expires: Error"
+    assert str(app.settings_path) in app.settings_file_item.title
 
 
-def test_update_spend_data_error(app, mock_fetch):
+def test_update_spend_data_error(app, mock_load_settings, mock_fetch_data):
     """DataError shows '❋ Data' title and error detail."""
-    mock_fetch.side_effect = DataError("Unexpected response format")
+    mock_fetch_data.side_effect = DataError("Unexpected response format")
 
     app.update_spend(None)
 
@@ -324,13 +338,14 @@ def test_update_spend_data_error(app, mock_fetch):
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
-    assert app.domain_item.title == "Domain: Error"
+    assert app.domain_item.title == "Domain: api.example.com"
     assert app.expiry_item.title == "Expires: Error"
+    assert str(app.settings_path) in app.settings_file_item.title
 
 
-def test_update_spend_generic_error(app, mock_fetch):
+def test_update_spend_generic_error(app, mock_load_settings, mock_fetch_data):
     """Unexpected exception shows '❋ Error' title and error detail."""
-    mock_fetch.side_effect = Exception("Unexpected error")
+    mock_fetch_data.side_effect = Exception("Unexpected error")
 
     app.update_spend(None)
 
@@ -339,33 +354,35 @@ def test_update_spend_generic_error(app, mock_fetch):
     assert app.spend_item.title == "Spend: Error"
     assert app.budget_item.title == "Budget: Error"
     assert app.usage_item.title == "Usage: Error"
-    assert app.domain_item.title == "Domain: Error"
+    assert app.domain_item.title == "Domain: api.example.com"
     assert app.expiry_item.title == "Expires: Error"
+    assert str(app.settings_path) in app.settings_file_item.title
 
 
-def test_update_spend_success_clears_error(app, mock_fetch):
-    """Successful update clears error_item."""
+def test_update_spend_success_clears_error(app, mock_load_settings, mock_fetch_data):
+    """Successful update clears error_item and settings_file_item."""
     info = {
         "spend": 25.50,
         "max_budget": 100.00,
         "expires": "2026-12-31T23:59:59"
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
     assert app.error_item.title == ""
+    assert app.settings_file_item.title == ""
     assert app.title == "❋ $25.50"
 
 
-def test_update_spend_large_spend_formatting(app, mock_fetch):
+def test_update_spend_large_spend_formatting(app, mock_load_settings, mock_fetch_data):
     """Large numbers formatted to 2 decimal places."""
     info = {
         "spend": 12345.678,
         "max_budget": 50000.999,
         "expires": "2026-12-31T23:59:59"
     }
-    mock_fetch.return_value = (info, "https://api.example.com")
+    mock_fetch_data.return_value = info
 
     app.update_spend(None)
 
